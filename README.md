@@ -1,9 +1,8 @@
 
-# ワ Wa
-
-Wacom strokes through evdev over userland
-realtime tablet controller device for programs or system
-this fork supports Adaptive Technology for ADA compliant web support
+# ワ Wa + ABLENET
+* Wacom strokes through evdev over userland
+* realtime tablet controller device for programs or system
+* this fork supports Adaptive Technology for ADA compliant trackpad web support
 
 # Install
 (LOAD "wa.lisp")
