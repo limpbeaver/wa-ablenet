@@ -404,7 +404,7 @@
       tempCanvas.width = inkCanvas.width || width;
       tempCanvas.height = inkCanvas.height || height;
       const tempCtx = tempCanvas.getContext('2d');
-      if (inkCanvas.width > 0) tempCtx.drawImage(inkCanvas, 0, 0);
+      if (inkCanvas.width > 0 && inkCanvas.height > 0) tempCtx.drawImage(inkCanvas, 0, 0);
 
       inkCanvas.width = width;
       inkCanvas.height = height;
@@ -413,7 +413,7 @@
       // Fill background white on ink layer
       inkCtx.fillStyle = '#ffffff';
       inkCtx.fillRect(0, 0, width, height);
-      if (tempCanvas.width > 0) inkCtx.drawImage(tempCanvas, 0, 0);
+      if (tempCanvas.width > 0 && tempCanvas.height > 0) inkCtx.drawImage(tempCanvas, 0, 0);
 
       // Center single brush point
       if (state.brush.x === 0 && state.brush.y === 0) {
@@ -423,10 +423,12 @@
         state.brush.prevY = state.brush.y;
       }
 
+      updateUI();
       redraw();
     }
 
     function clearInkCanvas() {
+      if (!inkCtx) return;
       inkCtx.fillStyle = '#ffffff';
       inkCtx.fillRect(0, 0, inkCanvas.width, inkCanvas.height);
       state.lastAction = 'Cleared Canvas';
@@ -448,7 +450,7 @@
       state.brush.y = Math.max(state.brush.width / 2, Math.min(canvas.height - state.brush.width / 2, state.brush.y));
 
       // Draw variable-width line tracer on persistent ink canvas
-      if (state.brush.x !== state.brush.prevX || state.brush.y !== state.brush.prevY) {
+      if (inkCtx && (state.brush.x !== state.brush.prevX || state.brush.y !== state.brush.prevY)) {
         inkCtx.beginPath();
         inkCtx.moveTo(state.brush.prevX, state.brush.prevY);
         inkCtx.lineTo(state.brush.x, state.brush.y);
@@ -466,7 +468,8 @@
     function handleTrackpadStart(e) {
       state.trackpadActive = true;
       mainTrackpad.classList.add('active');
-      const point = e.touches ? e.touches[0] : e;
+      try { mainTrackpad.setPointerCapture(e.pointerId); } catch (err) {}
+      const point = (e.touches && e.touches[0]) || e;
       state.lastPadX = point.clientX;
       state.lastPadY = point.clientY;
     }
@@ -474,7 +477,7 @@
     function handleTrackpadMove(e) {
       if (!state.trackpadActive) return;
       e.preventDefault();
-      const point = e.touches ? e.touches[0] : e;
+      const point = (e.touches && e.touches[0]) || e;
       const dx = point.clientX - state.lastPadX;
       const dy = point.clientY - state.lastPadY;
 
@@ -484,19 +487,22 @@
       moveBrushPoint(dx, dy);
     }
 
-    function handleTrackpadEnd() {
+    function handleTrackpadEnd(e) {
       state.trackpadActive = false;
       mainTrackpad.classList.remove('active');
+      try { if (e && e.pointerId) mainTrackpad.releasePointerCapture(e.pointerId); } catch (err) {}
     }
 
     mainTrackpad.addEventListener('pointerdown', handleTrackpadStart);
-    window.addEventListener('pointermove', handleTrackpadMove);
-    window.addEventListener('pointerup', handleTrackpadEnd);
+    mainTrackpad.addEventListener('pointermove', handleTrackpadMove);
+    mainTrackpad.addEventListener('pointerup', handleTrackpadEnd);
+    mainTrackpad.addEventListener('pointercancel', handleTrackpadEnd);
 
     // --- Acceleration Pad Controls ---
     function handleAccelStart(e) {
       state.accelActive = true;
       accelTrackpad.classList.add('active');
+      try { accelTrackpad.setPointerCapture(e.pointerId); } catch (err) {}
       updateAccel(e);
     }
 
@@ -506,16 +512,17 @@
       updateAccel(e);
     }
 
-    function handleAccelEnd() {
+    function handleAccelEnd(e) {
       state.accelActive = false;
       accelTrackpad.classList.remove('active');
+      try { if (e && e.pointerId) accelTrackpad.releasePointerCapture(e.pointerId); } catch (err) {}
       state.accelMultiplier = 1.0;
       updateUI();
     }
 
     function updateAccel(e) {
       const rect = accelTrackpad.getBoundingClientRect();
-      const point = e.touches ? e.touches[0] : e;
+      const point = (e.touches && e.touches[0]) || e;
       let normY = 1 - ((point.clientY - rect.top) / rect.height);
       normY = Math.max(0, Math.min(1, normY));
 
@@ -524,8 +531,9 @@
     }
 
     accelTrackpad.addEventListener('pointerdown', handleAccelStart);
-    window.addEventListener('pointermove', handleAccelMove);
-    window.addEventListener('pointerup', handleAccelEnd);
+    accelTrackpad.addEventListener('pointermove', handleAccelMove);
+    accelTrackpad.addEventListener('pointerup', handleAccelEnd);
+    accelTrackpad.addEventListener('pointercancel', handleAccelEnd);
 
     // --- Switch Pressure Adjustment ---
     // Left Click -> Increases pressure/width
@@ -572,8 +580,11 @@
 
     // --- Render Loop ---
     function redraw() {
+      // Clear canvas first
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
       // 1. Draw persistent black ink layer
-      ctx.drawImage(inkCanvas, 0, 0);
+      if (inkCanvas && inkCanvas.width > 0 && inkCanvas.height > 0) ctx.drawImage(inkCanvas, 0, 0);
 
       // 2. Draw single Calligraphy Tip cursor indicator
       const r = state.brush.width / 2;
