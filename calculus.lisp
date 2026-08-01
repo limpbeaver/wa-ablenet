@@ -2,6 +2,10 @@
 
 ;; 1. Simple Algebra
 
+'( ;; CLOJURE ISN'T COMMON LISP
+(defvar some-category [])
+)
+
 ;; given
 (= (* k V)
    (* 3 x))
